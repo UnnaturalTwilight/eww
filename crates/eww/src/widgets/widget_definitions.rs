@@ -14,6 +14,7 @@ use glib::translate::FromGlib;
 use gtk::{self, glib, prelude::*, DestDefaults, TargetEntry, TargetList};
 use gtk::{cairo, gdk::ffi::gdk_cairo_surface_create_from_pixbuf};
 use gtk::{gdk, pango};
+use gtk::{cairo, gdk::ffi::gdk_cairo_surface_create_from_pixbuf};
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 
@@ -595,6 +596,7 @@ fn build_gtk_image(bargs: &mut BuilderArgs) -> Result<gtk::Image> {
         // @prop preserve-aspect-ratio - whether to keep the aspect ratio when resizing an image. Default: true, false doesn't work for all image types
         // @prop fill-svg - sets the color of svg images
         prop(path: as_string, image_width: as_i32 = -1, image_height: as_i32 = -1, preserve_aspect_ratio: as_bool = true, fill_svg: as_string = "") {
+
             if !path.ends_with(".svg") && !fill_svg.is_empty() {
                 log::warn!("Fill attribute ignored, file is not an svg image");
             }
@@ -603,9 +605,11 @@ fn build_gtk_image(bargs: &mut BuilderArgs) -> Result<gtk::Image> {
                 let pixbuf_animation = gtk::gdk_pixbuf::PixbufAnimation::from_file(std::path::PathBuf::from(path))?;
                 gtk_widget.set_from_animation(&pixbuf_animation);
             } else {
-                let pixbuf;
+                let scale = gtk_widget.scale_factor();
+                let pixbuf: gtk::gdk_pixbuf::Pixbuf;
+
                 // populate the pixel buffer
-                if path.ends_with(".svg") && !fill_svg.is_empty() {
+                if path.ends_with(".svg") && !fill_svg.is_empty() { // render with fill
                     let svg_data = std::fs::read_to_string(std::path::PathBuf::from(path.clone()))?;
                     // The fastest way to add/change fill color
                     let svg_data = if svg_data.contains("fill=") {
@@ -616,7 +620,7 @@ fn build_gtk_image(bargs: &mut BuilderArgs) -> Result<gtk::Image> {
                         reg.replace(&svg_data, &format!("<svg fill=\"{}\"", fill_svg))
                     };
                     let stream = gtk::gio::MemoryInputStream::from_bytes(&gtk::glib::Bytes::from(svg_data.as_bytes()));
-                    pixbuf = gtk::gdk_pixbuf::Pixbuf::from_stream_at_scale(&stream, image_width, image_height, preserve_aspect_ratio, None::<&gtk::gio::Cancellable>)?;
+                    pixbuf = gtk::gdk_pixbuf::Pixbuf::from_stream_at_scale(&stream, image_width * scale, image_height * scale, preserve_aspect_ratio, None::<&gtk::gio::Cancellable>)?;
                     stream.close(None::<&gtk::gio::Cancellable>)?;
                 } else {
                     let w = if image_width > 0 {image_width * scale} else {-1};
