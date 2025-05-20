@@ -12,7 +12,6 @@ use eww_shared_util::Spanned;
 use gdk::{ModifierType, NotifyType};
 use glib::translate::FromGlib;
 use gtk::{self, glib, prelude::*, DestDefaults, TargetEntry, TargetList};
-use gtk::{cairo, gdk::ffi::gdk_cairo_surface_create_from_pixbuf};
 use gtk::{gdk, pango};
 use gtk::{cairo, gdk::ffi::gdk_cairo_surface_create_from_pixbuf};
 use itertools::Itertools;
