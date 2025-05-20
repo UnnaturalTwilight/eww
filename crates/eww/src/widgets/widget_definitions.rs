@@ -618,9 +618,24 @@ fn build_gtk_image(bargs: &mut BuilderArgs) -> Result<gtk::Image> {
                     pixbuf = gtk::gdk_pixbuf::Pixbuf::from_stream_at_scale(&stream, image_width, image_height, preserve_aspect_ratio, None::<&gtk::gio::Cancellable>)?;
                     stream.close(None::<&gtk::gio::Cancellable>)?;
                 } else {
-                    pixbuf = gtk::gdk_pixbuf::Pixbuf::from_file_at_scale(std::path::PathBuf::from(path), image_width, image_height, preserve_aspect_ratio)?;
+                    let w = if image_width > 0 {image_width * scale} else {-1};
+                    let h = if image_height > 0 {image_height * scale} else {-1};
+                    pixbuf = gtk::gdk_pixbuf::Pixbuf::from_file_at_scale(std::path::PathBuf::from(path), w, h, preserve_aspect_ratio)?;
+                    //gtk_widget.set_from_pixbuf(Some(&pixbuf));
                 }
-                gtk_widget.set_from_pixbuf(Some(&pixbuf));
+
+                // render to surface
+                let surface = unsafe {
+                    // gtk::cairo::Surface will destroy the underlying surface on drop
+                    let ptr = gdk_cairo_surface_create_from_pixbuf(
+                        pixbuf.as_ptr(),
+                        scale,
+                        std::ptr::null_mut(),
+                    );
+                    cairo::Surface::from_raw_full(ptr)?
+                };
+
+                gtk_widget.set_from_surface(Some(surface.as_ref()));
             }
         },
         // @prop icon - name of a theme icon
