@@ -22,6 +22,7 @@ All notable changes to eww will be listed here, starting at changes since versio
 - `get_locale` now follows POSIX standard for locale selection (By: mirhahn, w-lfchen)
 - Improve multi-monitor handling under wayland (By: bkueng)
 - Render image widget at full resolution when display scaling is enabled (By: zane-weissman)
+- Fix nth children of custom widgets not appering when widget is created by a for loop (By: UnnaturalTwilight)
 
 ### Features
 - Add warning and docs for incompatible `:anchor` and `:exclusive` options
@@ -42,7 +43,7 @@ All notable changes to eww will be listed here, starting at changes since versio
 - Add `:lines` and `:wrap-mode` properties to label widget (By: vaporii)
 - Add `value-pos` to scale widget (By: ipsvn)
 - Add `floor` and `ceil` function calls to simplexpr (By: wsbankenstein)
-- Add `byteshumanreadable` function calls to simplexpr (By: bkueng)
+- Add `formatbytes` function calls to simplexpr (By: topongo)
 - Add `read` and `written` to the `EWW_DISK` magic variable (By: bkueng)
 
 ## [0.6.0] (21.04.2024)

@@ -1,3 +1,4 @@
+use bytesize::ByteSize;
 use cached::proc_macro::cached;
 use chrono::{Local, LocalResult, TimeZone};
 use itertools::Itertools;
@@ -61,11 +62,11 @@ pub enum EvalError {
     #[error("Error parsing date: {0}")]
     ChronoError(String),
 
+    #[error("Error parsing byte format mode: {0}")]
+    ByteFormatModeError(String),
+
     #[error("{1}")]
     Spanned(Span, Box<EvalError>),
-
-    #[error("Invalid argument: {0}")]
-    InvalidArgument(String),
 }
 
 static_assertions::assert_impl_all!(EvalError: Send, Sync);
@@ -537,23 +538,34 @@ fn call_expr_function(name: &str, args: Vec<DynVal>) -> Result<DynVal, EvalError
             }
             _ => Err(EvalError::WrongArgCount(name.to_string())),
         },
-        "byteshumanreadable" => match args.as_slice() {
-            [size, digits] => {
-                let size = size.as_f64()?;
-                let digits = if size > 0.0 { digits.as_i32()? } else { 0 };
-                Ok(DynVal::from(bytes_human_readable(size, digits, true)))
-            }
-            [size, digits, unit] => {
-                let unit = unit.as_string()?;
-                if unit != "binary" && unit != "decimal" {
-                    return Err(EvalError::InvalidArgument(format!("expected 'binary' or 'decimal', given '{}'", unit)));
+        "formatbytes" => {
+            let (bytes, short, mode) = match args.as_slice() {
+                [bytes] => (bytes.as_i64()?, false, "iec".to_owned()),
+                [bytes, short] => (bytes.as_i64()?, short.as_bool()?, "iec".to_owned()),
+                [bytes, short, mode] => (bytes.as_i64()?, short.as_bool()?, mode.as_string()?),
+                _ => return Err(EvalError::WrongArgCount(name.to_string())),
+            };
+            let neg = bytes < 0;
+            let disp = ByteSize(bytes.abs() as u64).display();
+            let disp = match mode.as_str() {
+                "iec" => {
+                    if short {
+                        disp.iec_short()
+                    } else {
+                        disp.iec()
+                    }
                 }
-                let size = size.as_f64()?;
-                let digits = if size > 0.0 { digits.as_i32()? } else { 0 };
-                Ok(DynVal::from(bytes_human_readable(size, digits, unit == "binary")))
-            }
-            _ => Err(EvalError::WrongArgCount(name.to_string())),
-        },
+                "si" => {
+                    if short {
+                        disp.si_short()
+                    } else {
+                        disp.si()
+                    }
+                }
+                _ => return Err(EvalError::ByteFormatModeError(mode)),
+            };
+            Ok(DynVal::from(if neg { format!("-{disp}") } else { disp.to_string() }))
+        }
 
         _ => Err(EvalError::UnknownFunction(name.to_string())),
     }
@@ -592,31 +604,6 @@ fn run_jaq_function(json: serde_json::Value, code: String, args: &str) -> Result
         })
         .collect::<Result<_, _>>()
         .map_err(|e| EvalError::JaqError(e.to_string()))
-}
-
-fn bytes_human_readable(size: f64, digits: i32, unit_is_binary: bool) -> String {
-    let mut size = size;
-    let mut suffix = "B";
-
-    let base = if unit_is_binary { 1024u64 } else { 1000u64 };
-
-    if size > base.pow(5) as f64 {
-        size /= base.pow(5) as f64;
-        suffix = "PB";
-    } else if size > base.pow(4) as f64 {
-        size /= base.pow(4) as f64;
-        suffix = "TB";
-    } else if size > base.pow(3) as f64 {
-        size /= base.pow(3) as f64;
-        suffix = "GB";
-    } else if size > base.pow(2) as f64 {
-        size /= base.pow(2) as f64;
-        suffix = "MB";
-    } else if size > base.pow(1) as f64 {
-        size /= base.pow(1) as f64;
-        suffix = "KB";
-    }
-    format!("{:.1$} ", size, digits as usize) + suffix
 }
 
 #[cfg(test)]
@@ -681,9 +668,5 @@ mod tests {
         jq_empty_arg(r#"jq("[ \"foo\" ]", ".[0]", "")"#) => Ok(DynVal::from(r#""foo""#)),
         jq_invalid_arg(r#"jq("[ \"foo\" ]", ".[0]", "hello")"#) => Ok(DynVal::from(r#""foo""#)),
         jq_no_arg(r#"jq("[ \"foo\" ]", ".[0]")"#) => Ok(DynVal::from(r#""foo""#)),
-        byteshumanreadable1(r#"byteshumanreadable(2048,3)"#) => Ok(DynVal::from("2.000 KB")),
-        byteshumanreadable2(r#"byteshumanreadable(10000000000,3)"#) => Ok(DynVal::from("9.313 GB")),
-        byteshumanreadable3(r#"byteshumanreadable(2048,3,'decimal')"#) => Ok(DynVal::from("2.048 KB")),
-        byteshumanreadable4(r#"byteshumanreadable(10000000000,2,'decimal')"#) => Ok(DynVal::from("10.00 GB")),
     }
 }
