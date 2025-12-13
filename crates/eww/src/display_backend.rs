@@ -122,6 +122,10 @@ mod platform_wayland {
             }
             if window_init.backend_options.wayland.exclusive {
                 window.auto_exclusive_zone_enable();
+            } else if window_init.stacking == WindowStacking::Background{
+                // ignore exclusive zone settings for background windows
+                // this lets them be put in the backdrop on niri
+                window.set_exclusive_zone(-1);
             }
             Some(window)
         }
