@@ -304,7 +304,10 @@ fn build_gtk_combo_box_text(bargs: &mut BuilderArgs) -> Result<gtk::ComboBoxText
         // @prop onchange - runs the code when a item was selected, replacing {} with the item as a string
         prop(timeout: as_duration = Duration::from_millis(200), onchange: as_string) {
             connect_signal_handler!(gtk_widget, gtk_widget.connect_changed(move |gtk_widget| {
-                run_command(timeout, &onchange, &[gtk_widget.active_text().unwrap_or_else(|| "".into())]);
+                let active_text = gtk_widget.active_text().unwrap_or_else(|| "".into());
+                if !active_text.is_empty() {
+                    run_command(timeout, &onchange, &[active_text]);
+                }
             }));
         },
     });
